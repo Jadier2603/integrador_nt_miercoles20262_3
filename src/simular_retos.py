@@ -56,80 +56,7 @@ IDS_PRIORIDAD = [
 FILAS = 500
 
 
-# 5. Construir función generadora de datos
-
-def generar_retos(n=FILAS):
-
-    filas = []
-
-    # Generamos el 95% de las filas originales.
-    # El otro 5% serán duplicados exactos.
-
-    filas_originales = n - int(n * 0.05)
-
-    for _ in range(filas_originales):
-
-        # Fecha inicial del reto
-
-        fecha_inicio = fake.date_between(
-            start_date="-1y",
-            end_date="+3m"
-        )
-
-        # Fecha final entre 15 y 180 días después
-
-        fecha_fin = fecha_inicio + timedelta(
-            days=random.randint(15, 180)
-        )
-
-        filas.append({
-            "id": str(uuid.uuid4()),
-            "nombre": fake.sentence(
-                nb_words=6
-            ).rstrip("."),
-            "descripcion": fake.sentence(
-                nb_words=12
-            ),
-            "fecha_inicio": fecha_inicio,
-            "fecha_fin": fecha_fin,
-            "estado": random.choice(ESTADOS),
-            "id_empresa": random.choice(IDS_EMPRESA),
-            "id_categoria": random.choice(IDS_CATEGORIA),
-            "id_prioridad": random.choice(IDS_PRIORIDAD)
-        })
-
-    datos_df = pd.DataFrame(filas)
-
-    # 5% de duplicados exactos.
-    # Como n = 500, serán 25 duplicados.
-
-    cantidad_duplicados = int(n * 0.05)
-
-    duplicados = datos_df.sample(
-        n=cantidad_duplicados,
-        random_state=42
-    ).copy()
-
-    datos_df = pd.concat(
-        [
-            datos_df,
-            duplicados
-        ],
-        ignore_index=True
-    )
-
-    # Mezclar las filas para que los duplicados
-    # no queden todos al final.
-
-    datos_df = datos_df.sample(
-        frac=1,
-        random_state=42
-    ).reset_index(drop=True)
-
-    return datos_df
-
-
-# 6. Generar una muestra de índices para modificar
+# 5. Generar una muestra de índices para modificar
 
 def generar_muestra(datos, porcentaje):
 
@@ -139,11 +66,23 @@ def generar_muestra(datos, porcentaje):
     ).index
 
 
-# 7. Ensuciar los datos
+# 6. Ensuciar los datos
 
 def ensuciar(datos_df):
 
     datos_df = datos_df.copy()
+
+
+    # --------------------------------------------------------
+    # Fecha fin:
+    # Pasarla a texto YYYY-MM-DD para que el CSV, el XLSX
+    # y el JSON guarden exactamente lo mismo (si queda como
+    # objeto date, to_json la escribe como número epoch).
+    # --------------------------------------------------------
+
+    datos_df["fecha_fin"] = datos_df["fecha_fin"].apply(
+        lambda fecha: fecha.strftime("%Y-%m-%d")
+    )
 
 
     # --------------------------------------------------------
@@ -295,13 +234,89 @@ def ensuciar(datos_df):
     return datos_df
 
 
+# 7. Construir función generadora de datos
+
+def generar_retos(n=FILAS):
+
+    filas = []
+
+    # Generamos el 95% de las filas originales.
+    # El otro 5% serán duplicados exactos.
+
+    filas_originales = n - int(n * 0.05)
+
+    for _ in range(filas_originales):
+
+        # Fecha inicial del reto
+
+        fecha_inicio = fake.date_between(
+            start_date="-1y",
+            end_date="+3m"
+        )
+
+        # Fecha final entre 15 y 180 días después
+
+        fecha_fin = fecha_inicio + timedelta(
+            days=random.randint(15, 180)
+        )
+
+        filas.append({
+            "id": str(uuid.uuid4()),
+            "nombre": fake.sentence(
+                nb_words=6
+            ).rstrip("."),
+            "descripcion": fake.sentence(
+                nb_words=12
+            ),
+            "fecha_inicio": fecha_inicio,
+            "fecha_fin": fecha_fin,
+            "estado": random.choice(ESTADOS),
+            "id_empresa": random.choice(IDS_EMPRESA),
+            "id_categoria": random.choice(IDS_CATEGORIA),
+            "id_prioridad": random.choice(IDS_PRIORIDAD)
+        })
+
+    datos_df = pd.DataFrame(filas)
+
+    # Primero se ensucian las filas originales...
+
+    datos_df = ensuciar(datos_df)
+
+    # ...y DESPUÉS se copian el 5% de filas ya sucias.
+    # Así los duplicados quedan idénticos, tal cual.
+    # Como n = 500, serán 25 duplicados.
+
+    cantidad_duplicados = int(n * 0.05)
+
+    duplicados = datos_df.sample(
+        n=cantidad_duplicados,
+        random_state=42
+    ).copy()
+
+    datos_df = pd.concat(
+        [
+            datos_df,
+            duplicados
+        ],
+        ignore_index=True
+    )
+
+    # Mezclar las filas para que los duplicados
+    # no queden todos al final.
+
+    datos_df = datos_df.sample(
+        frac=1,
+        random_state=42
+    ).reset_index(drop=True)
+
+    return datos_df
+
+
 # 8. Ejecutar el programa
 
 if __name__ == "__main__":
 
     df = generar_retos()
-
-    df = ensuciar(df)
 
     print(df.shape)
 
